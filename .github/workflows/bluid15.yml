@@ -42,7 +42,14 @@ jobs:
           gem update --system 3.2.3
           gem install bundler -v 1.17.3
 
-          GEMDIR=$(dirname $(find . -type f -name Gemfile | head -n 1))
+          GEMFILE_PATH=$(find . -type f -name Gemfile | head -n 1)
+
+          if [ -z "$GEMFILE_PATH" ]; then
+            echo "ERROR: Gemfile not found!"
+            exit 1
+          fi
+
+          GEMDIR=$(dirname "$GEMFILE_PATH")
           echo "Found Gemfile in: $GEMDIR"
 
           cd "$GEMDIR"
@@ -51,14 +58,28 @@ jobs:
 
       - name: Set up database
         run: |
-          GEMDIR=$(dirname $(find . -type f -name Gemfile | head -n 1))
+          GEMFILE_PATH=$(find . -type f -name Gemfile | head -n 1)
+
+          if [ -z "$GEMFILE_PATH" ]; then
+            echo "ERROR: Gemfile not found!"
+            exit 1
+          fi
+
+          GEMDIR=$(dirname "$GEMFILE_PATH")
           cd "$GEMDIR"
           cp config/database.yml.github config/database.yml || echo "No custom DB config"
           bundle exec rake db:create db:migrate db:seed
 
       - name: Start Rails server in background
         run: |
-          GEMDIR=$(dirname $(find . -type f -name Gemfile | head -n 1))
+          GEMFILE_PATH=$(find . -type f -name Gemfile | head -n 1)
+
+          if [ -z "$GEMFILE_PATH" ]; then
+            echo "ERROR: Gemfile not found!"
+            exit 1
+          fi
+
+          GEMDIR=$(dirname "$GEMFILE_PATH")
           cd "$GEMDIR"
           nohup rails server -e test -p 3000 &
           sleep 10
