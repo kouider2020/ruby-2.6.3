@@ -24,35 +24,46 @@ jobs:
           --health-retries 5
 
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
 
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: 2.4.3
 
-      - name: Set up Node and Yarn
+      - name: Set up Node.js and Yarn
         uses: actions/setup-node@v3
         with:
           node-version: 12
 
-      - name: Install dependencies
+      - name: Install dependencies (dynamic Gemfile path)
         run: |
+          gem update --system 3.2.3
           gem install bundler -v 1.17.3
+
+          GEMDIR=$(dirname $(find . -type f -name Gemfile | head -n 1))
+          echo "Found Gemfile in: $GEMDIR"
+
+          cd "$GEMDIR"
           bundle install
           yarn install
 
       - name: Set up database
         run: |
+          GEMDIR=$(dirname $(find . -type f -name Gemfile | head -n 1))
+          cd "$GEMDIR"
           cp config/database.yml.github config/database.yml || echo "No custom DB config"
           bundle exec rake db:create db:migrate db:seed
 
-      - name: Start server in background
+      - name: Start Rails server in background
         run: |
+          GEMDIR=$(dirname $(find . -type f -name Gemfile | head -n 1))
+          cd "$GEMDIR"
           nohup rails server -e test -p 3000 &
           sleep 10
 
-      - name: Test server is responding
+      - name: Check if server is running
         run: |
           curl -f http://localhost:3000 || (echo "Server failed to start" && exit 1)
           
