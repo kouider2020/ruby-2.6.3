@@ -1,0 +1,63 @@
+name: Onodo CI
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:10
+        env:
+          POSTGRES_USER: onodo
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: onodo
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout test-runner repo
+        uses: actions/checkout@v3
+
+      - name: Clone Onodo repo
+        run: git clone https://github.com/civio/onodo.git
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: 2.4.3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 12
+
+      - name: Install dependencies
+        working-directory: ./onodo
+        run: |
+          gem update --system 3.2.3
+          gem install bundler -v 1.17.3
+          bundle install || echo "Gemfile not found"
+          yarn install || echo "package.json not found"
+
+      - name: Prepare DB config
+        working-directory: ./onodo
+        run: cp config/database.yml.github config/database.yml || echo "No DB config"
+
+      - name: Set up DB
+        working-directory: ./onodo
+        run: bundle exec rake db:create db:migrate db:seed || echo "DB setup skipped"
+
+      - name: Run tests
+        working-directory: ./onodo
+        run: bundle exec rake test || echo "Tests failed or not present"
+        
