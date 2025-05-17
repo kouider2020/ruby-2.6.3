@@ -8,7 +8,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       RUBY_VERSION: 2.4.3
-      PREFIX: /opt/ruby-${{ env.RUBY_VERSION }}
     steps:
       - name: Checkout source code
         uses: actions/checkout@v3
@@ -33,10 +32,10 @@ jobs:
         run: |
           curl -O https://cache.ruby-lang.org/pub/ruby/2.4/ruby-2.4.3.tar.gz
           tar -xzf ruby-2.4.3.tar.gz
-          cd ruby-2.4.3
 
       - name: Configure and build Ruby for arm-linux-gnueabihf
         run: |
+          PREFIX=/opt/ruby-$RUBY_VERSION
           cd ruby-2.4.3
           ./configure --host=arm-linux-gnueabihf --prefix=${PREFIX} --enable-shared
           make -j$(nproc)
@@ -44,7 +43,8 @@ jobs:
 
       - name: Package Ruby installation
         run: |
-          tar czf ruby-2.4.3-armhf.tar.gz -C ${PREFIX} .
+          PREFIX=/opt/ruby-$RUBY_VERSION
+          tar czf ruby-$RUBY_VERSION-armhf.tar.gz -C ${PREFIX} .
 
       - name: Upload Ruby artifact
         uses: actions/upload-artifact@v3
