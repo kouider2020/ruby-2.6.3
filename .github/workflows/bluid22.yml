@@ -10,7 +10,7 @@ jobs:
       RUBY_VERSION: 2.4.3
     steps:
       - name: Checkout source code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install dependencies for Ruby build
         run: |
@@ -47,7 +47,7 @@ jobs:
           tar czf ruby-$RUBY_VERSION-armhf.tar.gz -C ${PREFIX} .
 
       - name: Upload Ruby artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ruby-2.4.3-armhf
           path: ruby-2.4.3-armhf.tar.gz
