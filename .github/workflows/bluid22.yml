@@ -1,18 +1,17 @@
-name: Build Ruby 2.4.3 for ARMHF (Cross-Compile)
+name: Cross-Compile Ruby 2.4.3 for ARMHF
 
 on:
   workflow_dispatch:
 
 jobs:
   build-armhf:
-    name: Cross-compile Ruby 2.4.3 for ARMHF
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Cross-Compile Toolchain and Deps
+      - name: Install Dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -21,7 +20,6 @@ jobs:
             curl \
             git \
             libssl-dev \
-            libffi-dev \
             libyaml-dev \
             libreadline-dev \
             zlib1g-dev \
@@ -29,34 +27,44 @@ jobs:
             bison \
             flex
 
-      - name: Download Ruby Source
+      - name: Download Ruby 2.4.3 Source
         run: |
           curl -fsSL https://cache.ruby-lang.org/pub/ruby/2.4/ruby-2.4.3.tar.gz | tar xz
           mv ruby-2.4.3 ruby-src
-          mkdir -p ruby-build
+          mkdir ruby-build-host ruby-build-armhf
 
-      - name: Configure for Cross-Compile
+      - name: Build Host Miniruby
         working-directory: ruby-src
+        run: |
+          ./configure --prefix=$GITHUB_WORKSPACE/ruby-build-host
+          make miniruby -j$(nproc)
+          cp miniruby ../ruby-build-host/
+          make clean
+
+      - name: Cross-Compile Ruby for ARMHF
+        working-directory: ruby-src
+        env:
+          CC: arm-linux-gnueabihf-gcc
         run: |
           ./configure \
             --host=arm-linux-gnueabihf \
-            --prefix=$GITHUB_WORKSPACE/ruby-build \
+            --prefix=$GITHUB_WORKSPACE/ruby-build-armhf \
             --disable-install-doc \
             ac_cv_func_isnan=yes \
-            ac_cv_func_isinf=yes
+            ac_cv_func_isinf=yes \
+            ac_cv_func_strlcpy=no
 
-      - name: Build Ruby
-        working-directory: ruby-src
-        run: |
-          make -j$(nproc)
-          make install
+          # Use previously built host miniruby
+          make MINIRUBY=$GITHUB_WORKSPACE/ruby-build-host/miniruby -j$(nproc)
+          make MINIRUBY=$GITHUB_WORKSPACE/ruby-build-host/miniruby install
 
-      - name: Package Compiled Ruby
+      - name: Package Ruby
         run: |
-          tar czf ruby-2.4.3-armhf.tar.gz -C ruby-build .
+          tar czf ruby-2.4.3-armhf.tar.gz -C ruby-build-armhf .
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: ruby-2.4.3-armhf
           path: ruby-2.4.3-armhf.tar.gz
+          
