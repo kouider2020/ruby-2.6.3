@@ -3,66 +3,67 @@ name: Build Portable Ruby 2.4.3 ARMHF
 on:
   workflow_dispatch:
 
+env:
+  RUBY_VERSION: 2.4.3
+
 jobs:
   build-ruby-armhf:
     runs-on: ubuntu-latest
     env:
-      RUBY_VERSION: 2.4.3
+      PREFIX: /opt/ruby-2.4.3
       HOST_PREFIX: /opt/ruby-host
 
     steps:
       - name: Checkout source code
         uses: actions/checkout@v4
 
-      - name: Setup apt for Debian armhf and install dependencies
+      - name: Setup cross-compilation environment
         run: |
           sudo dpkg --add-architecture armhf
-          sudo sed -i 's|http://.*archive.ubuntu.com|http://deb.debian.org/debian|g' /etc/apt/sources.list
-          sudo sed -i 's|http://security.ubuntu.com/ubuntu|http://deb.debian.org/debian-security|g' /etc/apt/sources.list
           sudo apt-get update
           sudo apt-get install -y \
             build-essential \
             curl \
             git \
-            libssl-dev:armhf \
-            libyaml-dev:armhf \
-            libreadline-dev:armhf \
-            zlib1g-dev:armhf \
-            libffi-dev:armhf \
-            gcc-arm-linux-gnueabihf \
-            crossbuild-essential-armhf \
             libssl-dev \
             libyaml-dev \
             libreadline-dev \
             zlib1g-dev \
-            libffi-dev
+            libffi-dev \
+            gcc-arm-linux-gnueabihf \
+            crossbuild-essential-armhf \
+            libc6:armhf \
+            libssl-dev:armhf \
+            libyaml-dev:armhf \
+            libreadline-dev:armhf \
+            zlib1g-dev:armhf \
+            libffi-dev:armhf
 
       - name: Download Ruby source
         run: |
-          curl -O https://cache.ruby-lang.org/pub/ruby/2.4/ruby-${RUBY_VERSION}.tar.gz
-          tar -xzf ruby-${RUBY_VERSION}.tar.gz
+          curl -O https://cache.ruby-lang.org/pub/ruby/2.4/ruby-${{ env.RUBY_VERSION }}.tar.gz
+          tar -xzf ruby-${{ env.RUBY_VERSION }}.tar.gz
 
-      - name: Build host Ruby (native)
+      - name: Build host Ruby
         run: |
-          cd ruby-${RUBY_VERSION}
-          ./configure --prefix=${HOST_PREFIX}
+          cd ruby-${{ env.RUBY_VERSION }}
+          ./configure --prefix=${{ env.HOST_PREFIX }} --disable-install-doc
           make -j$(nproc)
           sudo make install
 
-      - name: Cross-compile Ruby for arm-linux-gnueabihf
+      - name: Build Ruby for armhf
         run: |
-          cd ruby-${RUBY_VERSION}
-          make clean
-          ./configure --host=arm-linux-gnueabihf --prefix=${PREFIX} --enable-shared --with-baseruby=${HOST_PREFIX}/bin/ruby
+          cd ruby-${{ env.RUBY_VERSION }}
+          ./configure --host=arm-linux-gnueabihf --prefix=${{ env.PREFIX }} --with-baseruby=${{ env.HOST_PREFIX }}/bin/ruby --enable-shared
           make -j$(nproc)
           sudo make install
 
       - name: Package Ruby installation
         run: |
-          tar czf ruby-${RUBY_VERSION}-armhf.tar.gz -C ${PREFIX} .
+          tar czf ruby-${{ env.RUBY_VERSION }}-armhf.tar.gz -C ${{ env.PREFIX }} .
 
       - name: Upload Ruby artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: ruby-${{ env.RUBY_VERSION }}-armhf
           path: ruby-${{ env.RUBY_VERSION }}-armhf.tar.gz
