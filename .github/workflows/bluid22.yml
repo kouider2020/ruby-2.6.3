@@ -56,6 +56,14 @@ jobs:
             --enable-shared --with-baseruby=/usr/local/ruby-2.4.3-host/bin/ruby
           make -j$(nproc)
           make install
+      - name: Manually build and install zlib extension
+        run: |
+          cd ruby-2.4.3/ext/zlib
+          arm-linux-gnueabihf-gcc -I../../../.ext/include/arm-linux-eabihf -I../../../include -I../../../ -I../../../missing -I/usr/arm-linux-gnueabihf/include -fPIC -o zlib.o -c zlib.c
+          ruby ../../miniruby -I../../lib -I. --disable-gems ../../tool/extlibs.rb --extout=. --make="make" --extension=zlib
+          make install DESTDIR=$PWD/install-cross
+          cp -a install-cross/* ${PREFIX}/
+          
 
       - name: Package Ruby installation
         run: |
