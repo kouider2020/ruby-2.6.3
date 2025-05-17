@@ -42,7 +42,7 @@ jobs:
       - name: Configure and build Ruby for arm-linux-gnueabihf
         run: |
           cd ruby-2.4.3
-          ./configure --host=arm-linux-gnueabihf --prefix=$PREFIX --enable-shared
+          ./configure --host=arm-linux-gnueabihf --prefix=$PREFIX --enable-shared --with-baseruby=/usr/bin/ruby
           make -j$(nproc)
           make install
 
