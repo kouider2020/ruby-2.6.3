@@ -22,6 +22,8 @@ jobs:
 
       - name: Setup cross-compilation environment
         run: |
+          dpkg --add-architecture armhf
+          apt-get update
           apt-get update
           apt-get install -y \
             dpkg-dev \
