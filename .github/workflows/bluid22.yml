@@ -5,18 +5,22 @@ on:
 
 jobs:
   build-ruby-armhf:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
+    container:
+      image: debian:bullseye
+
     env:
       RUBY_VERSION: 2.4.3
+      PREFIX: /opt/ruby-2.4.3
+
     steps:
       - name: Checkout source code
         uses: actions/checkout@v4
 
       - name: Install dependencies for Ruby build
         run: |
-          sudo dpkg --add-architecture armhf
-          sudo apt-get update
-          sudo apt-get install -y \
+          apt-get update
+          apt-get install -y \
             build-essential \
             curl \
             git \
@@ -26,7 +30,8 @@ jobs:
             zlib1g-dev:armhf \
             libffi-dev:armhf \
             gcc-arm-linux-gnueabihf \
-            crossbuild-essential-armhf
+            crossbuild-essential-armhf \
+            pkg-config
 
       - name: Download Ruby 2.4.3 source
         run: |
@@ -35,16 +40,14 @@ jobs:
 
       - name: Configure and build Ruby for arm-linux-gnueabihf
         run: |
-          PREFIX=/opt/ruby-$RUBY_VERSION
           cd ruby-2.4.3
-          ./configure --host=arm-linux-gnueabihf --prefix=${PREFIX} --enable-shared
+          ./configure --host=arm-linux-gnueabihf --prefix=$PREFIX --enable-shared
           make -j$(nproc)
           make install
 
       - name: Package Ruby installation
         run: |
-          PREFIX=/opt/ruby-$RUBY_VERSION
-          tar czf ruby-$RUBY_VERSION-armhf.tar.gz -C ${PREFIX} .
+          tar czf ruby-2.4.3-armhf.tar.gz -C $PREFIX .
 
       - name: Upload Ruby artifact
         uses: actions/upload-artifact@v4
