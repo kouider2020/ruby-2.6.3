@@ -13,15 +13,18 @@ jobs:
       PREFIX: /opt/ruby-2.4.3
       HOST_PREFIX: /opt/ruby-host
 
+    container:
+      image: debian:bullseye
+
     steps:
       - name: Checkout source code
         uses: actions/checkout@v4
 
       - name: Setup cross-compilation environment
         run: |
-          sudo dpkg --add-architecture armhf
-          sudo apt-get update
-          sudo apt-get install -y \
+          apt-get update
+          apt-get install -y \
+            dpkg-dev \
             build-essential \
             curl \
             git \
@@ -49,14 +52,14 @@ jobs:
           cd ruby-${{ env.RUBY_VERSION }}
           ./configure --prefix=${{ env.HOST_PREFIX }} --disable-install-doc
           make -j$(nproc)
-          sudo make install
+          make install
 
       - name: Build Ruby for armhf
         run: |
           cd ruby-${{ env.RUBY_VERSION }}
           ./configure --host=arm-linux-gnueabihf --prefix=${{ env.PREFIX }} --with-baseruby=${{ env.HOST_PREFIX }}/bin/ruby --enable-shared
           make -j$(nproc)
-          sudo make install
+          make install
 
       - name: Package Ruby installation
         run: |
