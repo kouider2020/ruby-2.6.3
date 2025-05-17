@@ -1,0 +1,62 @@
+name: Build Ruby 2.4.3 for ARMHF (Termux)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-armhf:
+    name: Cross-compile Ruby 2.4.3 for ARMHF
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Create Dockerfile
+        run: |
+          cat <<EOF > Dockerfile
+          FROM arm32v7/debian:stretch
+
+          RUN apt-get update && apt-get install -y \
+            build-essential \
+            curl \
+            git \
+            libssl-dev \
+            libyaml-dev \
+            libreadline-dev \
+            zlib1g-dev \
+            libffi-dev \
+            && apt-get clean
+
+          WORKDIR /ruby
+          RUN curl -fsSL https://cache.ruby-lang.org/pub/ruby/2.4/ruby-2.4.3.tar.gz | tar xz && \
+              cd ruby-2.4.3 && \
+              ./configure --prefix=/opt/ruby-2.4.3 --disable-install-doc && \
+              make -j\$(nproc) && \
+              make install
+          EOF
+
+      - name: Build ARMHF Docker Image
+        run: |
+          docker buildx build --platform linux/arm/v7 -t ruby-armhf:2.4.3 --output type=docker .
+
+      - name: Extract Ruby from Image
+        run: |
+          container_id=$(docker create ruby-armhf:2.4.3)
+          docker cp "$container_id:/opt/ruby-2.4.3" ./ruby-2.4.3-armhf
+          docker rm "$container_id"
+
+      - name: Upload Built Ruby as Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ruby-2.4.3-armhf
+          path: ruby-2.4.3-armhf
+          
