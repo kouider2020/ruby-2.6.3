@@ -63,7 +63,7 @@ jobs:
           tar czf ruby-${{ env.RUBY_VERSION }}-armhf.tar.gz -C ${{ env.PREFIX }} .
 
       - name: Upload Ruby artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ruby-${{ env.RUBY_VERSION }}-armhf
           path: ruby-${{ env.RUBY_VERSION }}-armhf.tar.gz
