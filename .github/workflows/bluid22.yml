@@ -27,21 +27,21 @@ jobs:
             bison \
             flex
 
-      - name: Download Ruby 2.4.3 Source
+      - name: Download Ruby 2.4.3
         run: |
           curl -fsSL https://cache.ruby-lang.org/pub/ruby/2.4/ruby-2.4.3.tar.gz | tar xz
           mv ruby-2.4.3 ruby-src
+          cp -r ruby-src ruby-src-host
           mkdir ruby-build-host ruby-build-armhf
 
-      - name: Build Host Miniruby
-        working-directory: ruby-src
+      - name: Build Full Ruby 2.4.3 for Host
+        working-directory: ruby-src-host
         run: |
           ./configure --prefix=$GITHUB_WORKSPACE/ruby-build-host
-          make miniruby -j$(nproc)
-          cp miniruby ../ruby-build-host/
-          make clean
+          make -j$(nproc)
+          make install
 
-      - name: Cross-Compile Ruby for ARMHF
+      - name: Cross-Compile Ruby 2.4.3 for ARMHF
         working-directory: ruby-src
         env:
           CC: arm-linux-gnueabihf-gcc
@@ -54,9 +54,9 @@ jobs:
             ac_cv_func_isinf=yes \
             ac_cv_func_strlcpy=no
 
-          # Use previously built host miniruby
-          make MINIRUBY=$GITHUB_WORKSPACE/ruby-build-host/miniruby -j$(nproc)
-          make MINIRUBY=$GITHUB_WORKSPACE/ruby-build-host/miniruby install
+          # Use full host ruby for build scripts
+          make RUBY=$GITHUB_WORKSPACE/ruby-build-host/bin/ruby -j$(nproc)
+          make RUBY=$GITHUB_WORKSPACE/ruby-build-host/bin/ruby install
 
       - name: Package Ruby
         run: |
