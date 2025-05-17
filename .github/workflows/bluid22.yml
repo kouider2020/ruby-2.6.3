@@ -17,8 +17,9 @@ jobs:
       - name: Checkout source code
         uses: actions/checkout@v4
 
-      - name: Install dependencies for Ruby build
+      - name: Enable armhf architecture and install dependencies
         run: |
+          dpkg --add-architecture armhf
           apt-get update
           apt-get install -y \
             build-essential \
