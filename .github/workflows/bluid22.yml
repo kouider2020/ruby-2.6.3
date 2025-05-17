@@ -36,6 +36,27 @@ jobs:
             dpkg-dev \
             gcc-arm-linux-gnueabihf \
             crossbuild-essential-armhf
+            dpkg --add-architecture armhf
+          apt-get update
+          apt-get update
+          apt-get install -y \
+            dpkg-dev \
+            build-essential \
+            curl \
+            git \
+            libssl-dev \
+            libyaml-dev \
+            libreadline-dev \
+            zlib1g-dev \
+            libffi-dev \
+            gcc-arm-linux-gnueabihf \
+            crossbuild-essential-armhf \
+            libc6:armhf \
+            libssl-dev:armhf \
+            libyaml-dev:armhf \
+            libreadline-dev:armhf \
+            zlib1g-dev:armhf \
+            libffi-dev:armhf
 
       - name: Build native Ruby 2.4.3 (host)
         run: |
