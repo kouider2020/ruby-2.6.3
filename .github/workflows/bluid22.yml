@@ -3,73 +3,67 @@ name: Build Portable Ruby 2.4.3 ARMHF
 on:
   workflow_dispatch:
 
-env:
-  RUBY_VERSION: 2.4.3
-
 jobs:
   build-ruby-armhf:
     runs-on: ubuntu-latest
-    env:
-      PREFIX: /opt/ruby-2.4.3
-      HOST_PREFIX: /opt/ruby-host
-
     container:
       image: debian:bullseye
+    env:
+      RUBY_VERSION: 2.4.3
+      PREFIX: /opt/ruby-2.4.3
 
     steps:
-      - name: Checkout source code
-        uses: actions/checkout@v4
-
-      - name: Setup cross-compilation environment
+      - name: Install dependencies
         run: |
-          dpkg --add-architecture armhf
-          apt-get update
           apt-get update
           apt-get install -y \
-            dpkg-dev \
             build-essential \
             curl \
             git \
+            wget \
             libssl-dev \
             libyaml-dev \
             libreadline-dev \
             zlib1g-dev \
             libffi-dev \
+            gcc \
+            make \
+            bison \
+            autoconf \
+            flex \
+            texinfo \
+            gawk \
+            dpkg-dev \
             gcc-arm-linux-gnueabihf \
-            crossbuild-essential-armhf \
-            libc6:armhf \
-            libssl-dev:armhf \
-            libyaml-dev:armhf \
-            libreadline-dev:armhf \
-            zlib1g-dev:armhf \
-            libffi-dev:armhf
+            crossbuild-essential-armhf
 
-      - name: Download Ruby source
+      - name: Build native Ruby 2.4.3 (host)
         run: |
-          curl -O https://cache.ruby-lang.org/pub/ruby/2.4/ruby-${{ env.RUBY_VERSION }}.tar.gz
-          tar -xzf ruby-${{ env.RUBY_VERSION }}.tar.gz
-
-      - name: Build host Ruby
-        run: |
-          cd ruby-${{ env.RUBY_VERSION }}
-          ./configure --prefix=${{ env.HOST_PREFIX }} --disable-install-doc
+          curl -O https://cache.ruby-lang.org/pub/ruby/2.4/ruby-2.4.3.tar.gz
+          tar xzf ruby-2.4.3.tar.gz
+          mv ruby-2.4.3 ruby-2.4.3-host
+          cd ruby-2.4.3-host
+          ./configure --prefix=/usr/local/ruby-2.4.3-host
           make -j$(nproc)
           make install
 
-      - name: Build Ruby for armhf
+      - name: Cross-compile Ruby 2.4.3 for armhf
         run: |
-          cd ruby-${{ env.RUBY_VERSION }}
-          ./configure --host=arm-linux-gnueabihf --prefix=${{ env.PREFIX }} --with-baseruby=${{ env.HOST_PREFIX }}/bin/ruby --enable-shared
+          curl -O https://cache.ruby-lang.org/pub/ruby/2.4/ruby-2.4.3.tar.gz
+          tar xzf ruby-2.4.3.tar.gz
+          cd ruby-2.4.3
+          ./configure --host=arm-linux-gnueabihf --prefix=${PREFIX} \
+            --enable-shared --with-baseruby=/usr/local/ruby-2.4.3-host/bin/ruby
           make -j$(nproc)
           make install
 
       - name: Package Ruby installation
         run: |
-          tar czf ruby-${{ env.RUBY_VERSION }}-armhf.tar.gz -C ${{ env.PREFIX }} .
+          tar czf ruby-2.4.3-armhf.tar.gz -C ${PREFIX} .
 
       - name: Upload Ruby artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ruby-${{ env.RUBY_VERSION }}-armhf
-          path: ruby-${{ env.RUBY_VERSION }}-armhf.tar.gz
+          name: ruby-2.4.3-armhf
+          path: ruby-2.4.3-armhf.tar.gz
           
