@@ -13,11 +13,13 @@ jobs:
     
     strategy:
       matrix:
-        arch: [aarch64, arm, i686, x86_64]
+        arch: [aarch64]
+        # Uncomment to build for all architectures:
+        # arch: [aarch64, arm, i686, x86_64]
     
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v3
     
     - name: Set up build environment
       run: |
@@ -151,7 +153,7 @@ jobs:
         dpkg-deb --build termux-package cmake-3.5.2-${{ matrix.arch }}.deb
     
     - name: Upload artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v3
       with:
         name: cmake-3.5.2-${{ matrix.arch }}
         path: cmake-3.5.2/build-${{ matrix.arch }}/cmake-3.5.2-${{ matrix.arch }}.deb
@@ -162,7 +164,7 @@ jobs:
         tar -czf ../cmake-3.5.2-termux-${{ matrix.arch }}.tar.gz .
     
     - name: Upload tarball
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v3
       with:
         name: cmake-3.5.2-termux-${{ matrix.arch }}-tarball
         path: cmake-3.5.2/build-${{ matrix.arch }}/cmake-3.5.2-termux-${{ matrix.arch }}.tar.gz
