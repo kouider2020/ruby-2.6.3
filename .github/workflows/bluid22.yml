@@ -1,88 +1,190 @@
-name: Build Portable CMake 3.5.1 ARMHF
+name: Build CMake 3.5 for Termux Bionic
 
 on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
-  build-cmake-armhf:
+  build-cmake:
     runs-on: ubuntu-latest
-    container:
-      image: debian:bullseye
-
-    env:
-      CMAKE_VERSION: 3.5.1
-      PREFIX: /opt/cmake-3.5.1-armhf
-      DEBIAN_FRONTEND: noninteractive
-
+    
+    strategy:
+      matrix:
+        arch: [aarch64, arm, i686, x86_64]
+    
     steps:
-      - name: Enable armhf architecture
-        run: |
-          dpkg --add-architecture armhf
-          apt-get update
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Set up build environment
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          curl \
+          wget \
+          git \
+          autoconf \
+          automake \
+          libtool \
+          pkg-config \
+          libssl-dev \
+          libncurses5-dev \
+          patch
+    
+    - name: Download and setup Android NDK
+      run: |
+        wget https://dl.google.com/android/repository/android-ndk-r23c-linux.zip
+        unzip -q android-ndk-r23c-linux.zip
+        echo "NDK_PATH=$PWD/android-ndk-r23c" >> $GITHUB_ENV
+    
+    - name: Set architecture variables
+      run: |
+        case "${{ matrix.arch }}" in
+          aarch64)
+            echo "TERMUX_ARCH=aarch64" >> $GITHUB_ENV
+            echo "ANDROID_ARCH=arm64-v8a" >> $GITHUB_ENV
+            echo "TOOLCHAIN_TRIPLE=aarch64-linux-android" >> $GITHUB_ENV
+            ;;
+          arm)
+            echo "TERMUX_ARCH=arm" >> $GITHUB_ENV
+            echo "ANDROID_ARCH=armeabi-v7a" >> $GITHUB_ENV
+            echo "TOOLCHAIN_TRIPLE=armv7a-linux-androideabi" >> $GITHUB_ENV
+            ;;
+          i686)
+            echo "TERMUX_ARCH=i686" >> $GITHUB_ENV
+            echo "ANDROID_ARCH=x86" >> $GITHUB_ENV
+            echo "TOOLCHAIN_TRIPLE=i686-linux-android" >> $GITHUB_ENV
+            ;;
+          x86_64)
+            echo "TERMUX_ARCH=x86_64" >> $GITHUB_ENV
+            echo "ANDROID_ARCH=x86_64" >> $GITHUB_ENV
+            echo "TOOLCHAIN_TRIPLE=x86_64-linux-android" >> $GITHUB_ENV
+            ;;
+        esac
+        echo "API_LEVEL=24" >> $GITHUB_ENV
+    
+    - name: Download CMake 3.5.2 source
+      run: |
+        wget https://cmake.org/files/v3.5/cmake-3.5.2.tar.gz
+        tar -xzf cmake-3.5.2.tar.gz
+        cd cmake-3.5.2
+    
+    - name: Create toolchain file
+      run: |
+        cat > toolchain.cmake << EOF
+        set(CMAKE_SYSTEM_NAME Android)
+        set(CMAKE_SYSTEM_VERSION ${{ env.API_LEVEL }})
+        set(CMAKE_ANDROID_ARCH_ABI ${{ env.ANDROID_ARCH }})
+        set(CMAKE_ANDROID_NDK ${{ env.NDK_PATH }})
+        set(CMAKE_ANDROID_STL_TYPE c++_shared)
+        
+        set(CMAKE_C_COMPILER ${{ env.NDK_PATH }}/toolchains/llvm/prebuilt/linux-x86_64/bin/${{ env.TOOLCHAIN_TRIPLE }}${{ env.API_LEVEL }}-clang)
+        set(CMAKE_CXX_COMPILER ${{ env.NDK_PATH }}/toolchains/llvm/prebuilt/linux-x86_64/bin/${{ env.TOOLCHAIN_TRIPLE }}${{ env.API_LEVEL }}-clang++)
+        
+        set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
+        set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
+        set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
+        set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
+        EOF
+    
+    - name: Apply Termux patches (if needed)
+      run: |
+        cd cmake-3.5.2
+        # Add any necessary patches for Termux compatibility here
+        # For example, you might need to patch for Android-specific issues
+        
+    - name: Bootstrap CMake for host
+      run: |
+        cd cmake-3.5.2
+        ./bootstrap --prefix=/tmp/cmake-host
+        make -j$(nproc)
+        make install
+    
+    - name: Build CMake for Termux
+      run: |
+        mkdir -p cmake-3.5.2/build-${{ matrix.arch }}
+        cd cmake-3.5.2/build-${{ matrix.arch }}
+        
+        export PATH="/tmp/cmake-host/bin:$PATH"
+        export CC="${{ env.NDK_PATH }}/toolchains/llvm/prebuilt/linux-x86_64/bin/${{ env.TOOLCHAIN_TRIPLE }}${{ env.API_LEVEL }}-clang"
+        export CXX="${{ env.NDK_PATH }}/toolchains/llvm/prebuilt/linux-x86_64/bin/${{ env.TOOLCHAIN_TRIPLE }}${{ env.API_LEVEL }}-clang++"
+        export AR="${{ env.NDK_PATH }}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar"
+        export RANLIB="${{ env.NDK_PATH }}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ranlib"
+        export STRIP="${{ env.NDK_PATH }}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip"
+        
+        cmake .. \
+          -DCMAKE_TOOLCHAIN_FILE=../../toolchain.cmake \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_INSTALL_PREFIX=/data/data/com.termux/files/usr \
+          -DCMAKE_USE_OPENSSL=OFF \
+          -DBUILD_TESTING=OFF \
+          -DCMAKE_CROSSCOMPILING=ON
+        
+        make -j$(nproc)
+        make install DESTDIR=$PWD/termux-install
+    
+    - name: Create Termux package
+      run: |
+        cd cmake-3.5.2/build-${{ matrix.arch }}
+        
+        # Create debian package structure
+        mkdir -p termux-package/data/data/com.termux/files/usr
+        cp -r termux-install/data/data/com.termux/files/usr/* termux-package/data/data/com.termux/files/usr/
+        
+        mkdir -p termux-package/DEBIAN
+        cat > termux-package/DEBIAN/control << EOF
+        Package: cmake
+        Version: 3.5.2
+        Architecture: ${{ matrix.arch }}
+        Maintainer: Your Name
+        Section: devel
+        Priority: optional
+        Description: Cross-platform build system generator
+         CMake is an extensible, open-source system that manages the build process
+         in an operating system and compiler-independent manner.
+        EOF
+        
+        dpkg-deb --build termux-package cmake-3.5.2-${{ matrix.arch }}.deb
+    
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: cmake-3.5.2-${{ matrix.arch }}
+        path: cmake-3.5.2/build-${{ matrix.arch }}/cmake-3.5.2-${{ matrix.arch }}.deb
+    
+    - name: Create tarball
+      run: |
+        cd cmake-3.5.2/build-${{ matrix.arch }}/termux-install
+        tar -czf ../cmake-3.5.2-termux-${{ matrix.arch }}.tar.gz .
+    
+    - name: Upload tarball
+      uses: actions/upload-artifact@v4
+      with:
+        name: cmake-3.5.2-termux-${{ matrix.arch }}-tarball
+        path: cmake-3.5.2/build-${{ matrix.arch }}/cmake-3.5.2-termux-${{ matrix.arch }}.tar.gz
 
-      - name: Install build dependencies
-        run: |
-          # keep update+install in same command where possible
-          apt-get update
-          apt-get install -y --no-install-recommends \
-            build-essential \
-            curl \
-            ca-certificates \
-            gcc \
-            g++ \
-            make \
-            crossbuild-essential-armhf \
-            gcc-arm-linux-gnueabihf \
-            libc6-dev:armhf \
-            zlib1g-dev:armhf \
-            libssl-dev \
-            zlib1g-dev \
-            pkg-config
-          rm -rf /var/lib/apt/lists/*
-
-      - name: Download CMake source and (optional) checksum
-        run: |
-          curl -L -o cmake-${CMAKE_VERSION}.tar.gz \
-            https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}.tar.gz
-          # Optional: verify checksum if you fetch a published checksum file:
-          # curl -L -o cmake-${CMAKE_VERSION}.tar.gz.sha256 \
-          #   https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}.tar.gz.sha256
-          # sha256sum -c cmake-${CMAKE_VERSION}.tar.gz.sha256
-
-      - name: Build native CMake (host)
-        run: |
-          tar xf cmake-${CMAKE_VERSION}.tar.gz
-          mv cmake-${CMAKE_VERSION} cmake-host
-          cd cmake-host
-          ./bootstrap --prefix=/usr/local/cmake-host
-          make -j$(nproc)
-          make install
-          /usr/local/cmake-host/bin/cmake --version
-
-      - name: Cross-compile CMake for ARMHF
-        run: |
-          tar xf cmake-${CMAKE_VERSION}.tar.gz
-          cd cmake-${CMAKE_VERSION}
-          mkdir build && cd build
-          /usr/local/cmake-host/bin/cmake .. \
-            -DCMAKE_SYSTEM_NAME=Linux \
-            -DCMAKE_SYSTEM_PROCESSOR=arm \
-            -DCMAKE_C_COMPILER=arm-linux-gnueabihf-gcc \
-            -DCMAKE_CXX_COMPILER=arm-linux-gnueabihf-g++ \
-            -DCMAKE_INSTALL_PREFIX=${PREFIX} \
-            -DBUILD_SHARED_LIBS=OFF \
-            -DCMAKE_USE_OPENSSL=OFF \
-            -DCMAKE_USE_SYSTEM_ZLIB=ON
-          make -j$(nproc)
-          make install
-          ${PREFIX}/bin/cmake --version || true
-
-      - name: Package CMake
-        run: |
-          tar czf cmake-${CMAKE_VERSION}-armhf.tar.gz -C "${PREFIX}" .
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: cmake-${{ env.CMAKE_VERSION }}-armhf
-          path: cmake-${{ env.CMAKE_VERSION }}-armhf.tar.gz
+  create-release:
+    needs: build-cmake
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+    
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: cmake-3.5.2-${{ github.run_number }}
+        name: CMake 3.5.2 for Termux
+        draft: false
+        prerelease: false
+        files: |
+          cmake-3.5.2-*/*.deb
+          cmake-3.5.2-*-tarball/*.tar.gz
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
