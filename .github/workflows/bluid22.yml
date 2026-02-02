@@ -1,96 +1,74 @@
-name: Build Portable Ruby 2.4.3 ARMHF
+name: Build Portable CMake 3.5.1 ARMHF
 
 on:
   workflow_dispatch:
 
 jobs:
-  build-ruby-armhf:
+  build-cmake-armhf:
     runs-on: ubuntu-latest
     container:
       image: debian:bullseye
+
     env:
-      RUBY_VERSION: 2.4.3
-      PREFIX: /opt/ruby-2.4.3
+      CMAKE_VERSION: 3.5.1
+      PREFIX: /opt/cmake-3.5.1-armhf
 
     steps:
-      - name: Install dependencies
+      - name: Enable armhf architecture
         run: |
+          dpkg --add-architecture armhf
           apt-get update
+
+      - name: Install build dependencies
+        run: |
           apt-get install -y \
             build-essential \
             curl \
-            git \
-            wget \
-            libssl-dev \
-            libyaml-dev \
-            libreadline-dev \
-            zlib1g-dev \
-            libffi-dev \
+            ca-certificates \
             gcc \
+            g++ \
             make \
-            bison \
-            autoconf \
-            flex \
-            texinfo \
-            gawk \
-            dpkg-dev \
-            gcc-arm-linux-gnueabihf \
-            crossbuild-essential-armhf
-            dpkg --add-architecture armhf
-          apt-get update
-          apt-get update
-          apt-get install -y \
-            dpkg-dev \
-            build-essential \
-            curl \
-            git \
-            libssl-dev \
-            libyaml-dev \
-            libreadline-dev \
-            zlib1g-dev \
-            libffi-dev \
-            gcc-arm-linux-gnueabihf \
             crossbuild-essential-armhf \
-            libc6:armhf \
-            libssl-dev:armhf \
-            libyaml-dev:armhf \
-            libreadline-dev:armhf \
-            zlib1g-dev:armhf \
-            libffi-dev:armhf
+            gcc-arm-linux-gnueabihf \
+            libc6-dev:armhf \
+            zlib1g-dev:armhf
 
-      - name: Build native Ruby 2.4.3 (host)
+      - name: Build native CMake (host)
         run: |
-          curl -O https://github.com/Kitware/CMake/releases/download/v3.5.1/cmake-3.5.1.tar.gz
-          tar xzf cmake-3.5.1.gz
-          mv cmake-3.5.1 cmake-3.5.1-host
-          cd cmake-3.5.1
-          ./bootstrap --prefix=$HOME/.local
+          curl -LO https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}.tar.gz
+          tar xf cmake-${CMAKE_VERSION}.tar.gz
+          mv cmake-${CMAKE_VERSION} cmake-host
+          cd cmake-host
+          ./bootstrap --prefix=/usr/local/cmake-host
           make -j$(nproc)
           make install
 
-      - name: Cross-compile Ruby 2.4.3 for armhf
+      - name: Cross-compile CMake for ARMHF
         run: |
-          curl -O https://cache.ruby-lang.org/pub/ruby/2.4/ruby-2.4.3.tar.gz
-          tar xzf cmake-3.5.1.tar.gz
-          cd cmake-3.5.1
-          ./configure --host=arm-linux-gnueabihf --prefix=${PREFIX} \
-            --enable-shared --with-baseruby=/usr/local/ruby-2.4.3-host/bin/ruby
+          tar xf cmake-${CMAKE_VERSION}.tar.gz
+          cd cmake-${CMAKE_VERSION}
+
+          mkdir build && cd build
+
+          /usr/local/cmake-host/bin/cmake .. \
+            -DCMAKE_SYSTEM_NAME=Linux \
+            -DCMAKE_SYSTEM_PROCESSOR=arm \
+            -DCMAKE_C_COMPILER=arm-linux-gnueabihf-gcc \
+            -DCMAKE_CXX_COMPILER=arm-linux-gnueabihf-g++ \
+            -DCMAKE_INSTALL_PREFIX=${PREFIX} \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DCMAKE_USE_OPENSSL=OFF \
+            -DCMAKE_USE_SYSTEM_ZLIB=ON
+
           make -j$(nproc)
           make install
-      - name: Build and install standard extensions
+
+      - name: Package CMake
         run: |
-          cd ruby-2.4.3
-          make DESTDIR=${PREFIX} install-ext
+          tar czf cmake-3.5.1-armhf.tar.gz -C ${PREFIX} .
 
-          
-
-      - name: Package Ruby installation
-        run: |
-          tar czf ruby-2.4.3-armhf.tar.gz -C ${PREFIX} .
-
-      - name: Upload Ruby artifact
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ruby-2.4.3-armhf
-          path: ruby-2.4.3-armhf.tar.gz
-          
+          name: cmake-3.5.1-armhf
+          path: cmake-3.5.1-armhf.tar.gz
