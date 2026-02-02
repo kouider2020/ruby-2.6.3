@@ -25,9 +25,9 @@ jobs:
             build-essential \
             curl \
             ca-certificates \
+            make \
             gcc \
             g++ \
-            make \
             crossbuild-essential-armhf \
             gcc-arm-linux-gnueabihf \
             libc6-dev:armhf \
@@ -47,7 +47,6 @@ jobs:
         run: |
           tar xf cmake-${CMAKE_VERSION}.tar.gz
           cd cmake-${CMAKE_VERSION}
-
           mkdir build && cd build
 
           /usr/local/cmake-host/bin/cmake .. \
@@ -56,9 +55,13 @@ jobs:
             -DCMAKE_C_COMPILER=arm-linux-gnueabihf-gcc \
             -DCMAKE_CXX_COMPILER=arm-linux-gnueabihf-g++ \
             -DCMAKE_INSTALL_PREFIX=${PREFIX} \
+            -DCMAKE_CROSSCOMPILING=TRUE \
+            -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY \
             -DBUILD_SHARED_LIBS=OFF \
             -DCMAKE_USE_OPENSSL=OFF \
-            -DCMAKE_USE_SYSTEM_ZLIB=ON
+            -DCMAKE_USE_SYSTEM_ZLIB=ON \
+            -DCMAKE_SKIP_RPATH=TRUE \
+            -DCMAKE_BUILD_TYPE=Release
 
           make -j$(nproc)
           make install
