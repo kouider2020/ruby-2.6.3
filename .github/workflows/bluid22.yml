@@ -12,6 +12,7 @@ jobs:
     env:
       CMAKE_VERSION: 3.5.1
       PREFIX: /opt/cmake-3.5.1-armhf
+      DEBIAN_FRONTEND: noninteractive
 
     steps:
       - name: Enable armhf architecture
@@ -21,57 +22,67 @@ jobs:
 
       - name: Install build dependencies
         run: |
-          apt-get install -y \
+          # keep update+install in same command where possible
+          apt-get update
+          apt-get install -y --no-install-recommends \
             build-essential \
             curl \
             ca-certificates \
-            make \
             gcc \
             g++ \
+            make \
             crossbuild-essential-armhf \
             gcc-arm-linux-gnueabihf \
             libc6-dev:armhf \
-            zlib1g-dev:armhf
+            zlib1g-dev:armhf \
+            libssl-dev \
+            zlib1g-dev \
+            pkg-config
+          rm -rf /var/lib/apt/lists/*
+
+      - name: Download CMake source and (optional) checksum
+        run: |
+          curl -L -o cmake-${CMAKE_VERSION}.tar.gz \
+            https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}.tar.gz
+          # Optional: verify checksum if you fetch a published checksum file:
+          # curl -L -o cmake-${CMAKE_VERSION}.tar.gz.sha256 \
+          #   https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}.tar.gz.sha256
+          # sha256sum -c cmake-${CMAKE_VERSION}.tar.gz.sha256
 
       - name: Build native CMake (host)
         run: |
-          curl -LO https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}.tar.gz
           tar xf cmake-${CMAKE_VERSION}.tar.gz
           mv cmake-${CMAKE_VERSION} cmake-host
           cd cmake-host
           ./bootstrap --prefix=/usr/local/cmake-host
           make -j$(nproc)
           make install
+          /usr/local/cmake-host/bin/cmake --version
 
       - name: Cross-compile CMake for ARMHF
         run: |
           tar xf cmake-${CMAKE_VERSION}.tar.gz
           cd cmake-${CMAKE_VERSION}
           mkdir build && cd build
-
           /usr/local/cmake-host/bin/cmake .. \
             -DCMAKE_SYSTEM_NAME=Linux \
             -DCMAKE_SYSTEM_PROCESSOR=arm \
             -DCMAKE_C_COMPILER=arm-linux-gnueabihf-gcc \
             -DCMAKE_CXX_COMPILER=arm-linux-gnueabihf-g++ \
             -DCMAKE_INSTALL_PREFIX=${PREFIX} \
-            -DCMAKE_CROSSCOMPILING=TRUE \
-            -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY \
             -DBUILD_SHARED_LIBS=OFF \
             -DCMAKE_USE_OPENSSL=OFF \
-            -DCMAKE_USE_SYSTEM_ZLIB=ON \
-            -DCMAKE_SKIP_RPATH=TRUE \
-            -DCMAKE_BUILD_TYPE=Release
-
+            -DCMAKE_USE_SYSTEM_ZLIB=ON
           make -j$(nproc)
           make install
+          ${PREFIX}/bin/cmake --version || true
 
       - name: Package CMake
         run: |
-          tar czf cmake-3.5.1-armhf.tar.gz -C ${PREFIX} .
+          tar czf cmake-${CMAKE_VERSION}-armhf.tar.gz -C "${PREFIX}" .
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: cmake-3.5.1-armhf
-          path: cmake-3.5.1-armhf.tar.gz
+          name: cmake-${{ env.CMAKE_VERSION }}-armhf
+          path: cmake-${{ env.CMAKE_VERSION }}-armhf.tar.gz
