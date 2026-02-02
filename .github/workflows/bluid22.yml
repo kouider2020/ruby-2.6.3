@@ -60,19 +60,19 @@ jobs:
 
       - name: Build native Ruby 2.4.3 (host)
         run: |
-          curl -O https://cache.ruby-lang.org/pub/ruby/2.4/ruby-2.4.3.tar.gz
-          tar xzf ruby-2.4.3.tar.gz
-          mv ruby-2.4.3 ruby-2.4.3-host
-          cd ruby-2.4.3-host
-          ./configure --prefix=/usr/local/ruby-2.4.3-host
+          curl -O https://github.com/Kitware/CMake/releases/download/v3.5.1/cmake-3.5.1.tar.gz
+          tar xzf cmake-3.5.1.gz
+          mv cmake-3.5.1 cmake-3.5.1-host
+          cd cmake-3.5.1
+          ./bootstrap --prefix=$HOME/.local
           make -j$(nproc)
           make install
 
       - name: Cross-compile Ruby 2.4.3 for armhf
         run: |
           curl -O https://cache.ruby-lang.org/pub/ruby/2.4/ruby-2.4.3.tar.gz
-          tar xzf ruby-2.4.3.tar.gz
-          cd ruby-2.4.3
+          tar xzf cmake-3.5.1.tar.gz
+          cd cmake-3.5.1
           ./configure --host=arm-linux-gnueabihf --prefix=${PREFIX} \
             --enable-shared --with-baseruby=/usr/local/ruby-2.4.3-host/bin/ruby
           make -j$(nproc)
