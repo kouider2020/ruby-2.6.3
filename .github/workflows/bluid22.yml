@@ -47,8 +47,8 @@ jobs:
 
       - name: Set up Android NDK toolchain
         run: |
-          export ANDROID_NDK_HOME=/opt/android/android-ndk
-          export TOOLCHAIN=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64
+          ANDROID_NDK_HOME=/opt/android/android-ndk
+          TOOLCHAIN=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64
 
           echo "ANDROID_NDK_HOME=$ANDROID_NDK_HOME" >> $GITHUB_ENV
           echo "TOOLCHAIN=$TOOLCHAIN" >> $GITHUB_ENV
@@ -63,10 +63,13 @@ jobs:
 
       - name: Build native Ruby 2.4.3 (host)
         run: |
+          unset CC CXX AR LD RANLIB STRIP SYSROOT
+
           curl -O https://cache.ruby-lang.org/pub/ruby/2.4/ruby-2.4.3.tar.gz
           tar xzf ruby-2.4.3.tar.gz
           mv ruby-2.4.3 ruby-2.4.3-host
           cd ruby-2.4.3-host
+
           ./configure --prefix=/usr/local/ruby-2.4.3-host
           make -j$(nproc)
           make install
