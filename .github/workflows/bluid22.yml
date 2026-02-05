@@ -1,4 +1,4 @@
-name: Build Portable Ruby 2.4.3 AARCH64
+name: Build Portable Ruby 2.4.3 AARCH64-ANDROID-NDK29
 
 on:
   workflow_dispatch:
@@ -8,9 +8,12 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: debian:bullseye
+
     env:
       RUBY_VERSION: 2.4.3
-      PREFIX: /opt/ruby-2.4.3-aarch64
+      PREFIX: /opt/ruby-2.4.3-aarch64-android
+      ANDROID_API: 21
+      ANDROID_NDK_VERSION: r29
 
     steps:
       - name: Install dependencies
@@ -21,21 +24,42 @@ jobs:
             curl \
             git \
             wget \
+            unzip \
             libssl-dev \
             libyaml-dev \
             libreadline-dev \
             zlib1g-dev \
             libffi-dev \
-            gcc \
-            make \
             bison \
             autoconf \
             flex \
             texinfo \
             gawk \
-            dpkg-dev \
-            gcc-aarch64-linux-gnu \
-            crossbuild-essential-arm64
+            dpkg-dev
+
+      - name: Install Android NDK r29
+        run: |
+          mkdir -p /opt/android
+          cd /opt/android
+          wget https://dl.google.com/android/repository/android-ndk-r29-linux.zip
+          unzip android-ndk-r29-linux.zip
+          mv android-ndk-r29 android-ndk
+
+      - name: Set up Android NDK toolchain
+        run: |
+          export ANDROID_NDK_HOME=/opt/android/android-ndk
+          export TOOLCHAIN=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64
+
+          echo "ANDROID_NDK_HOME=$ANDROID_NDK_HOME" >> $GITHUB_ENV
+          echo "TOOLCHAIN=$TOOLCHAIN" >> $GITHUB_ENV
+          echo "SYSROOT=$TOOLCHAIN/sysroot" >> $GITHUB_ENV
+
+          echo "CC=$TOOLCHAIN/bin/aarch64-linux-android${ANDROID_API}-clang" >> $GITHUB_ENV
+          echo "CXX=$TOOLCHAIN/bin/aarch64-linux-android${ANDROID_API}-clang++" >> $GITHUB_ENV
+          echo "AR=$TOOLCHAIN/bin/llvm-ar" >> $GITHUB_ENV
+          echo "RANLIB=$TOOLCHAIN/bin/llvm-ranlib" >> $GITHUB_ENV
+          echo "LD=$TOOLCHAIN/bin/ld.lld" >> $GITHUB_ENV
+          echo "STRIP=$TOOLCHAIN/bin/llvm-strip" >> $GITHUB_ENV
 
       - name: Build native Ruby 2.4.3 (host)
         run: |
@@ -47,13 +71,22 @@ jobs:
           make -j$(nproc)
           make install
 
-      - name: Cross-compile Ruby 2.4.3 for AARCH64
+      - name: Cross-compile Ruby 2.4.3 for Android (aarch64)
         run: |
+          export PATH=$TOOLCHAIN/bin:$PATH
+
           curl -O https://cache.ruby-lang.org/pub/ruby/2.4/ruby-2.4.3.tar.gz
           tar xzf ruby-2.4.3.tar.gz
           cd ruby-2.4.3
-          ./configure --host=aarch64-linux-gnu --prefix=${PREFIX} \
-            --enable-shared --with-baseruby=/usr/local/ruby-2.4.3-host/bin/ruby
+
+          ./configure \
+            --host=aarch64-linux-android \
+            --prefix=${PREFIX} \
+            --enable-shared \
+            --with-baseruby=/usr/local/ruby-2.4.3-host/bin/ruby \
+            ac_cv_func_getcontext=no \
+            ac_cv_func_setcontext=no
+
           make -j$(nproc)
           make install
 
@@ -61,13 +94,13 @@ jobs:
         run: |
           cd ruby-2.4.3
           make DESTDIR=${PREFIX} install-ext
-          
+
       - name: Package Ruby installation
         run: |
-          tar czf ruby-2.4.3-aarch64.tar.gz -C ${PREFIX} .
+          tar czf ruby-2.4.3-aarch64-android-ndk29.tar.gz -C ${PREFIX} .
 
       - name: Upload Ruby artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ruby-2.4.3-aarch64
-          path: ruby-2.4.3-aarch64.tar.gz
+          name: ruby-2.4.3-aarch64-android-ndk29
+          path: ruby-2.4.3-aarch64-android-ndk29.tar.gz
