@@ -44,7 +44,16 @@ jobs:
           wget https://dl.google.com/android/repository/android-ndk-r29-linux.zip
           unzip android-ndk-r29-linux.zip
           mv android-ndk-r29 android-ndk
+      - name: Build native Ruby 2.4.3 (host)
+        run: |
+          curl -O https://cache.ruby-lang.org/pub/ruby/2.4/ruby-2.4.3.tar.gz
+          tar xzf ruby-2.4.3.tar.gz
+          mv ruby-2.4.3 ruby-2.4.3-host
+          cd ruby-2.4.3-host
 
+          ./configure --prefix=/usr/local/ruby-2.4.3-host
+          make -j$(nproc)
+          make install
       - name: Set up Android NDK toolchain
         run: |
           ANDROID_NDK_HOME=/opt/android/android-ndk
@@ -61,18 +70,7 @@ jobs:
           echo "LD=$TOOLCHAIN/bin/ld.lld" >> $GITHUB_ENV
           echo "STRIP=$TOOLCHAIN/bin/llvm-strip" >> $GITHUB_ENV
 
-      - name: Build native Ruby 2.4.3 (host)
-        run: |
-          unset CC CXX AR LD RANLIB STRIP SYSROOT
 
-          curl -O https://cache.ruby-lang.org/pub/ruby/2.4/ruby-2.4.3.tar.gz
-          tar xzf ruby-2.4.3.tar.gz
-          mv ruby-2.4.3 ruby-2.4.3-host
-          cd ruby-2.4.3-host
-
-          ./configure --prefix=/usr/local/ruby-2.4.3-host
-          make -j$(nproc)
-          make install
 
       - name: Cross-compile Ruby 2.4.3 for Android (aarch64)
         run: |
