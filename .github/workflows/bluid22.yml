@@ -50,7 +50,14 @@ jobs:
           tar xzf ruby-2.4.3.tar.gz
           mv ruby-2.4.3 ruby-2.4.3-host
           cd ruby-2.4.3-host
-
+          export CFLAGS="\
+          -DHAVE_ENDPWENT=0 \
+          -Dendpwent()= \
+          -Wno-compound-token-split-by-macro \
+          -Wno-macro-redefined \
+          -Wno-incompatible-function-pointer-types \
+          -Wno-deprecated-declarations \
+          -fno-lto"
           ./configure --prefix=/usr/local/ruby-2.4.3-host
           make -j$(nproc)
           make install
